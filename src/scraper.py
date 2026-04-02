@@ -57,11 +57,21 @@ async def scroll_until_cutoff(page, cutoff_date):
 
     while not reached_cutoff and stagnant_count < 5:
         scroll_iteration += 1
-
         prev_count = await page.locator('li[id^="event_"]').count()
-
-        await page.evaluate("window.scrollBy(0, window.innerHeight)")
+        
+        await page.evaluate("window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })")
         await page.wait_for_timeout(2000)
+        
+        load_more_button = page.locator('#lnkLoadMore')
+        try:
+            if await load_more_button.is_visible():
+                await load_more_button.click()
+                await page.wait_for_load_state('networkidle')
+                print(f"Scroll iteration {scroll_iteration}: Clicked 'Load More' button")
+            else:
+                print(f"Scroll iteration {scroll_iteration}: 'Load More' button not visible")
+        except Exception as e:
+            print(f'Scroll iteration {scroll_iteration}: Could not intereact with load button: {e}')
 
         new_count = await page.locator('li[id^="event_"]').count()
 
@@ -76,11 +86,13 @@ async def scroll_until_cutoff(page, cutoff_date):
         html = await page.content()
         soup = BeautifulSoup(html, 'html.parser')
         
-        check_reached_cutoff(soup, cutoff_date)
-        # if check_reached_cutoff(soup, cutoff_date):
-        #     reached_cutoff = True
-        #     print(f"Scroll {scroll_iteration}: Reached cutoff date")
-        #     break
+        if check_reached_cutoff(soup, cutoff_date):
+            reached_cutoff = True
+            print(f"Scroll {scroll_iteration}: Reached cutoff date")
+            break
+    
+    if stagnant_count >= 5:
+        print(f"Stopped scrolling after {scroll_iteration} iterations with no new events loaded.")
     
     final_count = await page.locator('li[id^="event_"]').count()
     print(f"Total events loaded: {final_count}")
@@ -90,12 +102,17 @@ def check_reached_cutoff(soup, cutoff_date):
     
     for sep in seperators:
         date_text = sep.get_text(strip=True) # Example: "Fri, Apr 3, 2026" - "Mon, Apr 6, 2026"
-        print(date_text)
+        event_date = parse_date_from_seperator(sep)
+        if event_date and event_date > cutoff_date:
+            print(f"Found seperator beyond cutoff: {date_text} - {event_date}")
+            return True
+        
+    return False
 
 def parse_date_from_seperator(sep):
     date_text = sep.get_text(strip=True)
     today = Date.datetime.now().date()
-    format = ""
+    format = "%a, %b %d, %Y"
 
     if date_text == "Ongoing":
         return None
@@ -106,8 +123,13 @@ def parse_date_from_seperator(sep):
     if date_text == "Tomorrow":
         return Date.datetime.combine(today + Date.timedelta(days=1), Date.time.min)
     
+    try:
+        parsed = Date.datetime.strptime(date_text, format)
+        return parsed
+    except ValueError:
+        return None
 
-    
+    return None
 
 if __name__ == "__main__":
     asyncio.run(scrape_events())
