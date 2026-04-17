@@ -15,6 +15,13 @@ and focus on everything after that.
 
 """
 
+
+"""
+TODO List: 
+- Potentially add a dry run flag that only scrapes up to 10-20 events for faster testing
+- Potentailly use tqdm for a progress bar instead of print statements
+"""
+
 from auth import auth, validate_session
 from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
@@ -109,7 +116,7 @@ def check_reached_cutoff(soup, cutoff_date):
         
     return False
 
-def parse_date_from_seperator(sep):
+def parse_date_from_seperator(sep) -> Date.datetime | None:
     date_text = sep.get_text(strip=True)
     today = Date.datetime.now().date()
     format = "%a, %b %d, %Y"
@@ -129,7 +136,18 @@ def parse_date_from_seperator(sep):
     except ValueError:
         return None
 
-    return None
+
+def extract_and_filter_events(soup, cutoff_date) -> list[BeautifulSoup]:
+    events_list = soup.find('ul', id='divAllItems')
+
+    if not events_list:
+        print('Could not find events list')
+        return []
+
+    all_items = events_list.find_all('li', recursive=False)
+    print(f"Total items found: {len(all_items)}")
+    return all_items
+
 
 if __name__ == "__main__":
     asyncio.run(scrape_events())
