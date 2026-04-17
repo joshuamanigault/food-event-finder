@@ -18,7 +18,6 @@ and focus on everything after that.
 
 """
 TODO List: 
-- Potentially add a dry run flag that only scrapes up to 10-20 events for faster testing
 - Potentailly use tqdm for a progress bar instead of print statements
 """
 
@@ -53,6 +52,7 @@ async def scrape_events(dry_run_limit: int | None = None):
 
         html = await page.content()
         soup = BeautifulSoup(html, 'html.parser')
+        filtered_events = extract_and_filter_events(soup, cutoff_date)
 
         await context.close()
         await browser.close()
@@ -61,7 +61,7 @@ async def scrape_events(dry_run_limit: int | None = None):
 async def scroll_until_cutoff(page, cutoff_date, dry_run_limit: int | None = None):
     if dry_run_limit:
         print(f"DRY RUN MODE: Limiting scraping to {dry_run_limit} events")
-        
+
     reached_cutoff = False
     stagnant_count = 0
     scroll_iteration = 0
@@ -152,8 +152,26 @@ def extract_and_filter_events(soup, cutoff_date) -> list[BeautifulSoup]:
         return []
 
     all_items = events_list.find_all('li', recursive=False)
-    print(f"Total items found: {len(all_items)}")
-    return all_items
+    filtered_events =  []
+    current_date = None
+
+    for item in all_items:
+        if 'list-group__separator' in item.get('class', []):
+            date_text = item.get_text(strip=True)
+            current_date = parse_date_from_seperator(date_text)
+            continue
+
+        if 'list-group-item' in item.get('class', []) and 'event_' in item.get('id', ''):
+            if current_date == None:
+                continue
+            
+            if current_date > cutoff_date:
+                continue
+
+            filtered_events.append(item)
+    
+    return filtered_events
+
 
 
 if __name__ == "__main__":
