@@ -28,6 +28,7 @@ from playwright.async_api import async_playwright
 from pathlib import Path
 import datetime as Date
 import asyncio
+import argparse
 
 PROJECT_ROOT = Path(__file__).parent.parent
 TARGET_URL = "https://sundevilcentral.eoss.asu.edu/events?format=on_campus"
@@ -35,7 +36,7 @@ SESSION_DIR = PROJECT_ROOT / "data" / "session"
 STORAGE_STATE_PATH = SESSION_DIR / "storage_state.json"
 
 
-async def scrape_events():
+async def scrape_events(dry_run_limit: int | None = None):
     cutoff_date = Date.datetime.now() + Date.timedelta(weeks=2)
 
     if not await validate_session():
@@ -48,7 +49,7 @@ async def scrape_events():
         await page.goto(TARGET_URL, wait_until="networkidle")
         await page.wait_for_selector("#divAllItems", timeout=10000)
 
-        await scroll_until_cutoff(page, cutoff_date)
+        await scroll_until_cutoff(page, cutoff_date, dry_run_limit)
 
         html = await page.content()
         soup = BeautifulSoup(html, 'html.parser')
@@ -57,7 +58,10 @@ async def scrape_events():
         await browser.close()
 
 
-async def scroll_until_cutoff(page, cutoff_date):
+async def scroll_until_cutoff(page, cutoff_date, dry_run_limit: int | None = None):
+    if dry_run_limit:
+        print(f"DRY RUN MODE: Limiting scraping to {dry_run_limit} events")
+        
     reached_cutoff = False
     stagnant_count = 0
     scroll_iteration = 0
@@ -81,6 +85,9 @@ async def scroll_until_cutoff(page, cutoff_date):
             print(f'Scroll iteration {scroll_iteration}: Could not intereact with load button: {e}')
 
         new_count = await page.locator('li[id^="event_"]').count()
+
+        if dry_run_limit and new_count >= dry_run_limit:
+            break
 
         if new_count == prev_count:
             stagnant_count += 1
@@ -150,4 +157,21 @@ def extract_and_filter_events(soup, cutoff_date) -> list[BeautifulSoup]:
 
 
 if __name__ == "__main__":
-    asyncio.run(scrape_events())
+    parser = argparse.ArgumentParser(
+        description="Scrape ASU events, decide if they have food or not, sync to Google Calendar"
+        )
+
+    parser.add_argument(
+        '--dry-run', 
+        type=int,
+        nargs='?',
+        const=15,
+        help="Dry run mode: limit scraping to N events (10-30; Default : 15)"
+        )
+    
+    args = parser.parse_args()
+    if args.dry_run and (args.dry_run < 10 or args.dry_run > 30):
+        print("Dry run limit should be between 10 and 30")
+        exit(1)
+
+    asyncio.run(scrape_events(dry_run_limit=args.dry_run))
