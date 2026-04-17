@@ -53,6 +53,8 @@ async def scrape_events(dry_run_limit: int | None = None):
         html = await page.content()
         soup = BeautifulSoup(html, 'html.parser')
         filtered_events = extract_and_filter_events(soup, cutoff_date)
+        for i in range(len(filtered_events)):
+            print(f"Event {i + 1}: {filtered_events[i]}")
 
         await context.close()
         await browser.close()
@@ -157,8 +159,7 @@ def extract_and_filter_events(soup, cutoff_date) -> list[BeautifulSoup]:
 
     for item in all_items:
         if 'list-group__separator' in item.get('class', []):
-            date_text = item.get_text(strip=True)
-            current_date = parse_date_from_seperator(date_text)
+            current_date = parse_date_from_seperator(item)
             continue
 
         if 'list-group-item' in item.get('class', []) and 'event_' in item.get('id', ''):
@@ -167,11 +168,21 @@ def extract_and_filter_events(soup, cutoff_date) -> list[BeautifulSoup]:
             
             if current_date > cutoff_date:
                 continue
-
-            filtered_events.append(item)
+            
+            event_data = parse_event_details(item)
+            event_data['event_date'] = current_date
+            filtered_events.append(event_data)
     
     return filtered_events
 
+def parse_event_details(event_item) -> dict:
+    event_id = event_item.get('id', '').replace('event_', '')
+    text_content = event_item.get_text(strip=True)
+
+    return {
+        'id': event_id,
+        'raw_text': text_content,
+    }
 
 
 if __name__ == "__main__":
