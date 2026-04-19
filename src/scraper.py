@@ -60,7 +60,7 @@ async def scrape_events(dry_run_limit: int | None = None):
         await browser.close()
 
 
-async def scroll_until_cutoff(page, cutoff_date, dry_run_limit: int | None = None):
+async def scroll_until_cutoff(page, cutoff_date: Date.datetime, dry_run_limit: int | None = None):
     if dry_run_limit:
         print(f"DRY RUN MODE: Limiting scraping to {dry_run_limit} events")
 
@@ -113,7 +113,7 @@ async def scroll_until_cutoff(page, cutoff_date, dry_run_limit: int | None = Non
     final_count = await page.locator('li[id^="event_"]').count()
     print(f"Total events loaded: {final_count}")
 
-def check_reached_cutoff(soup, cutoff_date):
+def check_reached_cutoff(soup: BeautifulSoup, cutoff_date: Date.datetime) -> bool:
     seperators = soup.find_all('li', class_='list-group__separator')
     
     for sep in seperators:
@@ -125,7 +125,7 @@ def check_reached_cutoff(soup, cutoff_date):
         
     return False
 
-def parse_date_from_seperator(sep) -> Date.datetime | None:
+def parse_date_from_seperator(sep: BeautifulSoup) -> Date.datetime | None:
     date_text = sep.get_text(strip=True)
     today = Date.datetime.now().date()
     format = "%a, %b %d, %Y"
@@ -146,7 +146,7 @@ def parse_date_from_seperator(sep) -> Date.datetime | None:
         return None
 
 
-def extract_and_filter_events(soup, cutoff_date) -> list[BeautifulSoup]:
+def extract_and_filter_events(soup: BeautifulSoup, cutoff_date: Date.datetime) -> list[BeautifulSoup]:
     events_list = soup.find('ul', id='divAllItems')
 
     if not events_list:
@@ -175,7 +175,7 @@ def extract_and_filter_events(soup, cutoff_date) -> list[BeautifulSoup]:
     
     return filtered_events
 
-def parse_event_details(event_item) -> dict:
+def parse_event_details(event_item: BeautifulSoup) -> dict:
     event_id = event_item.get('id', '').replace('event_', '')
     text_content = event_item.get_text(strip=True)
 
