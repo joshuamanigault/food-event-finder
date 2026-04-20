@@ -23,6 +23,7 @@ TODO List:
 
 from auth import auth, validate_session
 from bs4 import BeautifulSoup
+from bs4.element import Tag
 from playwright.async_api import async_playwright
 from pathlib import Path
 import datetime as Date
@@ -81,7 +82,7 @@ async def scroll_until_cutoff(page, cutoff_date: Date.datetime, dry_run_limit: i
                 await load_more_button.click()
                 await page.wait_for_load_state('networkidle')
                 print(f"Scroll iteration {scroll_iteration}: Clicked 'Load More' button")
-            else:
+            else: 
                 print(f"Scroll iteration {scroll_iteration}: 'Load More' button not visible")
         except Exception as e:
             print(f'Scroll iteration {scroll_iteration}: Could not intereact with load button: {e}')
@@ -125,7 +126,7 @@ def check_reached_cutoff(soup: BeautifulSoup, cutoff_date: Date.datetime) -> boo
         
     return False
 
-def parse_date_from_seperator(sep: BeautifulSoup) -> Date.datetime | None:
+def parse_date_from_seperator(sep) -> Date.datetime | None:
     date_text = sep.get_text(strip=True)
     today = Date.datetime.now().date()
     format = "%a, %b %d, %Y"
@@ -146,7 +147,7 @@ def parse_date_from_seperator(sep: BeautifulSoup) -> Date.datetime | None:
         return None
 
 
-def extract_and_filter_events(soup: BeautifulSoup, cutoff_date: Date.datetime) -> list[BeautifulSoup]:
+def extract_and_filter_events(soup: BeautifulSoup, cutoff_date: Date.datetime) -> list[dict]:
     events_list = soup.find('ul', id='divAllItems')
 
     if not events_list:
@@ -158,12 +159,15 @@ def extract_and_filter_events(soup: BeautifulSoup, cutoff_date: Date.datetime) -
     current_date = None
 
     for item in all_items:
-        if 'list-group__separator' in item.get('class', []):
+        item_classes = item.get('class') or []
+        item_id = item.get('id') or ''
+
+        if 'list-group__separator' in item_classes:
             current_date = parse_date_from_seperator(item)
             continue
 
-        if 'list-group-item' in item.get('class', []) and 'event_' in item.get('id', ''):
-            if current_date == None:
+        if 'list-group-item' in item_classes and 'event_' in item_id:
+            if current_date is None:
                 continue
             
             if current_date > cutoff_date:
@@ -175,15 +179,14 @@ def extract_and_filter_events(soup: BeautifulSoup, cutoff_date: Date.datetime) -
     
     return filtered_events
 
-def parse_event_details(event_item: BeautifulSoup) -> dict:
-    event_id = event_item.get('id', '').replace('event_', '')
+def parse_event_details(event_item: Tag) -> dict:
+    event_id = str(event_item.get('id') or '').replace('event_', '')
     text_content = event_item.get_text(strip=True)
 
     return {
         'id': event_id,
         'raw_text': text_content,
     }
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
