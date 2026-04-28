@@ -175,6 +175,8 @@ def extract_and_filter_events(soup: BeautifulSoup, cutoff_date: Date.datetime) -
             
             event_data = parse_event_details(item)
             event_data['event_date'] = current_date
+            if event_data['location'] == "Online Event":
+                continue
             filtered_events.append(event_data)
     
     return filtered_events
@@ -194,6 +196,7 @@ def parse_event_details(event_item: Tag) -> dict:
     if legend:
         full_title = legend.get_text(strip=True)
         event_title = full_title.split(',')[0]
+
 
     return {
         'id': event_id,
