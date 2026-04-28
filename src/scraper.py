@@ -181,11 +181,24 @@ def extract_and_filter_events(soup: BeautifulSoup, cutoff_date: Date.datetime) -
 
 def parse_event_details(event_item: Tag) -> dict:
     event_id = str(event_item.get('id') or '').replace('event_', '')
-    text_content = event_item.get_text(strip=True)
+
+    # Safely extract event location 
+    event_location = "No location"
+    location_div = event_item.find('div', class_='col-md-4 col-lg-4')
+    if location_div:
+        event_location = location_div.get_text(strip=True)
+    
+    # Safely extract event title
+    legend = event_item.find('legend')
+    event_title = "No title"
+    if legend:
+        full_title = legend.get_text(strip=True)
+        event_title = full_title.split(',')[0]
 
     return {
         'id': event_id,
-        'raw_text': text_content,
+        'location': event_location,
+        'title': event_title
     }
 
 if __name__ == "__main__":
